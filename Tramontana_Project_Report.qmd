@@ -1,0 +1,1056 @@
+---
+title: "Project Report"
+author: "Dave Arthur, Jordan Liu, and Olivia Persin"
+subtitle: "Data Visualizations Final Client Project"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    code-tools: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(readr)
+library(stringr)
+```
+
+```{r}
+salaries <- read_csv(paste0(
+  "https://stat.cmu.edu/~sgallagh/courses/mads-fall-2026/",
+  "datavis-36613/data/salaries.csv.gz"
+)) 
+salaries_25 <- read_csv(paste0(
+  "https://stat.cmu.edu/~sgallagh/courses/mads-fall-2026/",
+  "datavis-36613/data/salaries.csv.gz"
+)) %>%
+  filter(work_year == 2025)
+```
+
+## Client Decision and Recommendation
+
+We recommend that our company establish a relationship with Google LLC and target positions for U.S.-based L4 Software Engineers as we have observed high salary growth in software engineering roles and the highest margin gain at the intermediate experience tier.
+
+## Data Scope and Credibility Audit
+
+### Data Source
+
+Our analysis uses salary observations contained in the [Global Data & AI Workforce Compensation](https://aijobs.net/salaries/) with a snapshot date of August 3, 2025. The Kaggle dataset [Data Science, AI & ML Job Salaries in 2025](https://www.kaggle.com/datasets/adilshamim8/salaries-for-data-science-jobs) mirrors compensation information available on aijobs.net as of the snapshot date. We last accessed the Kaggle dataset on October 8, 2026. Compensation is reported in U.S. dollars and reflects annual salary converted to a common currency. In our report, when the source for a graphic is listed as ‘Data Science, AI & ML Job Salaries in 2025,’ it refers to this dataset.
+
+The dataset [Data Science, AI & ML Job Salaries in 2025](https://www.kaggle.com/datasets/adilshamim8/salaries-for-data-science-jobs) has 151,445 rows, plus the header. Within the dataset, one row represents one job posting found on the aijobs.net website. The website is a specialized job board for AI, machine learning, and data science roles. These job postings were taken from 2020 to 2025, with the majority in 2024 and 2025. The data goes up to August 3, 2025. Each row contains information about the year the compensation was reported, the experience level of the role (entry-level, mid-level, senior-level, or executive), the employment type (full-time, part-time, contract, or freelance), the job title, the salary in the reported currency and in U.S. dollars, the employee and company locations, the ratio of remote work (fully remote, hybrid, or fully in-person), and the company size (small, medium, or large). 
+
+### Duplicate Discussion
+
+There are 79,532 rows that are exact duplicates with at least one other row. For instance, rows 14 and 16 both record a full-time, senior-level manager role at a medium-sized company with a salary of 121,000 USD in 2025. Although over half the number of total observations are exact duplicates, we decided to retain them because it is uncertain whether duplicate rows are recording the same specific job or are accounting for separate jobs with identical characteristics. An exact duplicate could be an erroneous byproduct from web scraping, but it is also plausible that a company has a new job with the same features copied from a template. There is not enough evidence to justify removing all exact duplicates, since it is impossible to identify which ones are certainly erroneous and which ones are genuinely distinct jobs. This is a limitation of the dataset.
+
+As a consequence of retaining exact duplicates, our regression results may underestimate standard errors due to an inflated sample size, increasing the chance of a Type I error. When we run a regression model to determine the effect of remote work, this may lead us to claim a relation when there is none. Also, the possibility of observations not being independent introduces frequency bias and casts doubt onto the reliability of the findings.
+The histograms and boxplots may look different due to the inclusion of duplicates. If duplicates are concentrated around the tails, then the distribution of salary would appear to be more leptokurtic and highly variable than it really is. Alternatively, if duplicates are concentrated around the center, then the distribution would appear more platykurtic and less variable.
+
+Median values should not be as sensitive to the inclusion of duplicates, assuming that the sample sizes are large and the duplicates have a similar median value or distribution. Hence, the time-series graphics, which use median salaries to be representative of typical workers, would not change by much, except for instances in which there are low sample sizes for certain subcategories. For example, there are fewer than 30 observations for each experience tier at small companies in each year, so the inclusion of duplicates may have greatly changed the median values for compensation. Time series trends with low sample sizes should therefore be interpreted very cautiously.
+
+### Variable Scopes and Coverage
+
+Coverage varies substantially across years, with the dataset growing from just 75 observations in 2020 to 78,726 observations in 2025. Since the earliest years contain very small sample sizes (2020–2022) and therefore provide limited representation of the labor market, this analysis focuses largely on 2025 observations, which offer the most comprehensive coverage of compensation patterns. Although 2025 may reflect a partial year of data collection, it contains substantially more observations than any previous year and provides the strongest basis for statistical analysis. The usage of 2025 data also compensates for recurring observations across separate years. 
+
+```{r, echo=FALSE, include=FALSE}
+salaries %>%
+  count(work_year)
+```
+
+```{r, echo=FALSE}
+ggplot(salaries, aes(x = factor(work_year))) +
+  geom_bar() + 
+  labs(
+    title = "Job Coverage by Year",
+    x = "Work Year",
+    y = "Number of Observations"
+  ) +
+  theme_classic()
+```
+
+There are some graphics which do use data from before 2025. These include the two time-series graphics, which display data from 2020 to 2025. The margin gains bar plot utilizes data from 2023 to 2025 because there is no data on small-company executive compensation in 2024 or 2025. Also, the global map showing salary growth from 2024 to 2025 uses data from those years.
+
+```{r, echo=FALSE, include=FALSE}
+salaries_25 %>%
+  count(remote_ratio)
+```
+
+The dataset is dominated by on-site positions, which account for approximately 80% of observations. Fully remote positions represent roughly 20% of observations, while hybrid positions comprise a very small share of the dataset. Since the hybrid category contains only 40 observations in 2025, conclusions regarding hybrid work arrangements should be interpreted cautiously.
+
+Additionally, the vast majority of the dataset comes from medium-size companies, with 147,302 entries from medium-size companies, compared to 3926 entries from large companies and only 217 entries from small companies. Given this imbalance, caution is needed when interpreting results for small and perhaps even large companies. This imbalance is particularly notable for 2025, which is the year we chose to focus on to avoid duplicate entries. Even though the 2025 data has the most observations overall, only 10 observations come from small companies in that year. Thus, the amount of conclusions we can reasonably justify from small companies in our dataset is rather small. However, given that our goal is to pitch our services to a large, market-leading Fortune 500 company, the trends for small companies are of little importance for our argumentation. There are a sufficiently large number of observations (1527) for large companies, so our arguments based on large companies should be broadly generalizable to the company we are pitching, Google LLC. 
+
+In terms of geography, the vast majority of companies within the observations are located in the United States. Of the 151,445 entries in total, over 135,000 have company locations in the United States. Canada, with 6,208 entries, and the United Kingdom, with 4,181 entries, also have particularly high concentrations of entries. Other countries with at least 100 entries include Austria, Australia, Brazil, Estonia, France, Germany, Ireland, Latvia, Lithuania, Mexico, the Netherlands, Poland, and Slovakia. There are 97 countries in total with data, but the small sample size of most countries means that the conclusions we can garner from their data are limited. It is also important to consider for the other variables we analyze that any trends found reflect are trends that are in the most part created by the American data, with a smaller emphasis on Canada, the United Kingdom, and the European Union. 
+
+### Job Title Composition and Role Families
+
+```{r, echo=FALSE, include=FALSE}
+salaries_25 %>%
+  count(job_title, sort = TRUE)
+```
+
+The dataset contains 316 unique job titles, so individual title comparisons would be difficult to interpret and many titles describe similar work using different naming conventions. Our company’s objective is to identify role categories that offer the greatest opportunity for recruiting highly compensated talent. To create meaningful comparison groups, job titles were consolidated into seven analytically defined role families: Data Science, AI / Machine Learning, Data Engineering, Analytics / BI, Leadership, Software Engineering, and Other. Each of the seven role families contain a substantial sample size to be included in the dataset.
+
+```{r, echo=FALSE}
+library(knitr)
+
+role_domain_table <- data.frame(
+  Role_Domain = c(
+    "Data Science",
+    "AI / Machine Learning",
+    "Data Engineering",
+    "Analytics / BI",
+    "Leadership",
+    "Software Engineering",
+    "Other"
+  ),
+  Example_Titles = c(
+    "Data Scientist, Applied Scientist, Research Scientist",
+    "Machine Learning Engineer, AI Engineer, Artificial Intelligence roles",
+    "Data Engineer, Analytics Engineer, Data Architect, Data Infrastructure Engineer",
+    "Analyst, Business Intelligence, Analytics roles",
+    "Manager, Director, Head, Chief, Vice President, Lead",
+    "Software Engineer, Systems Engineer, Developer, Architect, Engineer",
+    "Titles not captured by the above rules"
+  )
+)
+
+colnames(role_domain_table) <- c(
+  "Role Domain",
+  "Example Titles"
+)
+
+knitr::kable(
+  role_domain_table,
+  caption = "Role Family Definitions Used in the Analysis"
+)
+```
+
+The complete role-family definitions were implemented using the keyword matching rules documented in the reproducibility appendix. Since these categories were created analytically rather than supplied by the source dataset, some job titles may reasonably belong to more than one role family.
+
+### Data Limitations
+
+One main caveat of the data is that no information on specific companies is recorded. Thus, in order to select a specific company to pitch our services to and to solidify the argument for that company, external research had to be conducted. Another limitation to each row in the dataset is the lack of row-level source information. While we assume that aijobs.net website to be generally reliable, we cannot rule out the possibility of erroneous or inaccurate data. The dataset also represents an incomplete picture of the AI-related job market as a whole. There may be some unobservable reasons why certain jobs end up on the job board and others do not, so we cannot make any definitive claims that the observations reflect precise employer demand or job-opening counts. In terms of individual variables, the information we can glean from them is limited as well. We only have geographical information on a country level, and remote status only includes three coarse values, with very few of the observations being listed as hybrid. 
+
+
+## Compensation landscape
+
+Salary distributions were compared across these role families using median compensation and boxplots rather than relying solely on average salaries. Compensation data are highly right-skewed, with a relatively small number of extremely high earners inflating the upper tail of the distribution. As a result, medians, interquartile ranges, percentiles, and log-transformed visualizations provide a more representative summary of typical compensation than simple means.
+
+```{r}
+#put in appendix
+
+library(dplyr)
+library(stringr)
+
+salaries_domains <- salaries_25 %>%
+  mutate(
+    role_domain = case_when(
+
+      str_detect(
+        job_title,
+        regex(
+          "data scientist|applied scientist|research scientist",
+          ignore_case = TRUE
+        )
+      ) ~ "Data Science",
+
+      str_detect(
+        job_title,
+        regex(
+          "machine learning|ml engineer|ai engineer|artificial intelligence|ai ",
+          ignore_case = TRUE
+        )
+      ) ~ "AI / Machine Learning",
+
+      str_detect(
+        job_title,
+        regex(
+          "data engineer|analytics engineer|data architect|data infrastructure",
+          ignore_case = TRUE
+        )
+      ) ~ "Data Engineering",
+
+      str_detect(
+        job_title,
+        regex(
+          "analyst|business intelligence|analytics",
+          ignore_case = TRUE
+        )
+      ) ~ "Analytics / BI",
+
+      str_detect(
+        job_title,
+        regex(
+          "manager|director|head|chief|vice president|vp|lead",
+          ignore_case = TRUE
+        )
+      ) ~ "Leadership",
+
+      str_detect(
+        job_title,
+        regex(
+          "software engineer|developer|systems engineer|architect|engineer",
+          ignore_case = TRUE
+        )
+      ) ~ "Software Engineering",
+
+      TRUE ~ "Other"
+    )
+  )
+
+```
+
+```{r}
+library(patchwork)
+
+p1 <- ggplot(salaries_domains, aes(x = salary_in_usd)) +
+  geom_histogram(
+    bins = 50,
+    fill = "#2C7FB8",
+    color = "white"
+  ) +
+  scale_x_continuous(labels = dollar) +
+  labs(
+    subtitle = "Raw Salaries",
+    x = "Salary (USD)",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+p2 <- ggplot(salaries_domains, aes(x = salary_in_usd)) +
+  geom_histogram(
+    bins = 50,
+    fill = "#2CA02C",
+    color = "white"
+  ) +
+  scale_x_log10(labels = dollar) +
+  labs(
+    subtitle = "Log-Transformed Salaries",
+    x = "Salary (Log Scale)",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+(p1 | p2) +
+  plot_annotation(
+    title = "Log-Transformation Reduces the Right-Skewness in the \nDistribution of 2025 Compensation Records",
+    subtitle = "2025 compensation observations reported in nominal U.S. dollars",
+    caption = 'The raw salary distribution is heavily right-skewed due to a small number of extremely high earners. \nLog transformation compresses the upper tail and reveals underlying distributional structure.\n
+    Source: “Data Science, AI & ML Job Salaries in 2025” on Kaggle'
+  )
+
+```
+
+The raw distribution demonstrates substantial right-skewness, while the log-transformed distribution reveals the underlying structure of compensation that is obscured by a relatively small number of extreme earners.
+
+To identify unusually high earners, compensation outliers were defined using the conventional boxplot criterion of Q3 + 1.5×IQR. This produced an outlier threshold of approximately $335,000, which lies above the 95th percentile of the salary distribution. Using this definition, 1,892 observations (2.4% of the dataset) were classified as compensation outliers.
+
+The distributional analysis reveals substantial differences across role families. AI / Machine Learning roles exhibit the highest median compensation, followed closely by Leadership, Software Engineering, and Data Science positions. In contrast, Analytics / BI roles tend to have the lowest compensation levels. Software Engineering contains the largest concentration of compensation outliers, indicating that while typical salaries are already high, there is also substantial opportunity for exceptionally large earnings within that domain.
+
+
+```{r, echo=FALSE, include=FALSE}
+quantile(
+  salaries_domains$salary_in_usd,
+  probs = c(.90, .95, .99)
+)
+```
+
+```{r}
+#normal
+ggplot(
+  salaries_domains,
+  aes(
+    x = reorder(role_domain, salary_in_usd, median),
+    y = salary_in_usd,
+    fill = role_domain
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.15
+  ) +
+  coord_cartesian(
+    ylim = c(0, 400000)
+  ) +
+  scale_y_continuous(
+    labels = scales::label_dollar(scale = 1/1000, suffix = "K")
+  ) +
+  labs(
+    title = "AI/Machine Learning, Software Engineering, and \nLeadership Roles exhibit the highest \n 2025 median compensation",
+    caption = 'Source: “Data Science, AI & ML Job Salaries in 2025” on Kaggle',
+    x = NULL,
+    y = "Salary (USD)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5
+    ),
+    axis.text.x = element_text(
+      angle = 20,
+      hjust = 1
+    )
+  )
+```
+
+These comparison groups directly support our company’s recruiting decision since they identify which categories of talent command the strongest market compensation. The findings suggest that organizations competing for AI / Machine Learning, Software Engineering, Leadership, and Data Science talent should expect substantially higher compensation requirements than organizations hiring for Analytics / BI or other technical support roles.
+
+## Career and Market Signals 
+
+### Is there a “remote work premium” or a “remote penalty”?
+
+The goal of our regression analysis was to determine whether employees working remotely earn more or less than comparable on-site employees.
+
+```{r, echo=FALSE, include=FALSE}
+salaries_25 %>%
+  group_by(remote_ratio) %>%
+  summarize(
+    n = n(),
+    median_salary = median(salary_in_usd),
+    mean_salary = mean(salary_in_usd)
+  )
+```
+
+Remote and on-site employees exhibited nearly identical compensation levels in the 2025 dataset, with median salaries of approximately \$146,300 for fully remote employees and \$145,000 for on-site employees. Although the hybrid category appeared to earn substantially less, it contained only 40 observations and was therefore considered too small to support reliable conclusions. To determine whether remote work had a meaningful relationship with compensation, a log-linear regression model was estimated while controlling for experience level, company size, job title, and company location. A reduced model excluding remote work status was then compared to a full model including remote work status using a nested-model ANOVA.
+
+```{r, echo=FALSE, include=FALSE}
+# regression model
+model_full <- lm(
+  log(salary_in_usd) ~
+    factor(remote_ratio) +
+    factor(experience_level) +
+    factor(company_size) +
+    factor(job_title) +
+    factor(company_location),
+  data = salaries_25
+)
+
+model_reduced <- lm(
+  log(salary_in_usd) ~
+    factor(experience_level) +
+    factor(company_size) +
+    factor(job_title) +
+    factor(company_location),
+  data = salaries_25
+)
+
+
+
+coef(summary(model_full))[grep("remote_ratio",
+                           rownames(coef(summary(model_full)))), ]
+
+anova(model_reduced, model_full)
+```
+
+The ANOVA results showed that the full model provided a significantly better fit than the reduced model (F(2, 78,332) = 35.93, p \< .001), indicating that work arrangement contributes additional information when explaining compensation differences. The regression coefficients estimate that fully remote employees earn approximately 2.6% less than comparable on-site employees after accounting for the other compensation factors included in the model. Diagnostic plots were examined to assess the assumptions of linear regression. A logarithmic transformation of salary substantially improved the residual distribution and reduced heteroscedasticity relative to the untransformed model. While some departures from normality remained in the tails, the large sample size (n = 78,726) suggests that the model is sufficiently robust for inference.
+
+```{r}
+#| fig-cap: "Diagnostic Plots for the Final 2025 Log-Transformed Remote Work Compensation Model"
+
+
+#show assumptions of linear regression are satisfied
+par(mfrow = c(2, 2))
+
+plot(model_full)
+
+```
+
+To evaluate the regression assumptions, we examined the standard diagnostic plots for the final log-transformed model. The analysis uses salary observations from a single year (2025), but the possibility of multiple job postings from the same company casts doubt onto whether the assumption of independent observations is fully satisfied. That said, we believe the independence assumption to be reasonably satisfied for our analysis. The Residuals vs. Fitted and Scale-Location plots show substantially improved variance behavior compared with the untransformed model, although some heteroscedasticity remains. The Normal Q-Q plot indicates departures from normality in the tails, suggesting that a small number of extreme compensation observations continue to influence the residual distribution. However, the overall pattern is much closer to normality than in the original salary model. Given the large sample size of more than 78,000 observations, the model should be reasonably robust to these remaining violations.
+
+```{r}
+salaries2 <- salaries_25 %>%
+  mutate(
+    experience_level = factor(
+      experience_level,
+      levels = c("EN", "MI", "SE", "EX"),
+      labels = c("Entry", "Mid", "Senior", "Executive")
+    ),
+    remote_cat = factor(
+      remote_ratio,
+      levels = c(0, 50, 100),
+      labels = c("On-Site", "Hybrid", "Fully Remote")
+    )
+  )
+
+ggplot(
+  salaries2,
+  aes(
+    x = experience_level,
+    y = salary_in_usd,
+    fill = remote_cat
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.1
+  ) +
+  coord_cartesian(
+    ylim = c(0, 400000)
+  ) +
+  scale_fill_manual(
+    values = c(
+      "On-Site" = "#1F77B4",
+      "Hybrid" = "#FF7F0E",
+      "Fully Remote" = "#2CA02C"
+    )
+  ) +
+  scale_y_continuous(
+    labels = label_dollar(scale = 1/1000, suffix = "K")
+  ) +
+  labs(
+    title = "2025 Compensation by Experience Level \nand Work Arrangement",
+    subtitle = "Salary differences between remote and on-site employees are \nsmall within experience levels",
+    caption = "Source: 'Data Science, AI & ML Job Salaries in 2025' on Kaggle",
+    x = "Experience Level",
+    y = "Salary (USD)",
+    fill = "Work Arrangement"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"),
+    plot.subtitle = element_text(
+      hjust = 0.5)
+  )
+```
+
+The analysis provides evidence of a statistically significant remote-work penalty, with fully remote employees earning approximately 2.6% less than comparable on-site employees after controlling for major compensation drivers. However, the magnitude of the effect is relatively small when compared with the substantially larger compensation differences associated with experience level, occupation, and location. Therefore, work arrangement appears to have only a modest association with compensation in the 2025 data and should not be considered a primary determinant of salary.
+
+### What geographical areas pose the biggest compensation benefits? 
+
+The first map below shows which countries have the highest median salary among countries with 2025 observations. Among countries with a substantial number of observations, the U.S. has the highest median salary at 150,380 USD, with Australia (119,566), Canada (117,341), and New Zealand (115,268) next in line. All of these countries have at least 50 job postings in 2025, so a sufficiently high sample size. Countries in Northern Europe and East Asia had high salaries as well, while developing countries, as well as Spain, and France, tended to have lower median salaries. The Democratic Republic of the Congo and Bulgaria stand out on the map as having high median salaries as well, but each country only has two observations. Therefore, the conclusions that can be gleaned from that are limited. 
+
+```{r}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+library(scales)
+library(ggthemes)
+library(patchwork)
+
+# Final project data
+salaries <- readr::read_csv(paste0(
+  "https://stat.cmu.edu/~sgallagh/courses/mads-fall-2026/",
+  "datavis-36613/data/salaries.csv.gz"
+))
+
+world <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  select(iso_a2, name, geometry) %>%
+  mutate(
+    # Fix Natural Earth's "-99" bug for France and Norway
+    iso_a2 = case_when(
+      name == "France" ~ "FR",
+      name == "Norway" ~ "NO",
+      TRUE ~ iso_a2
+    ),
+    iso_a2 = toupper(trimws(iso_a2))
+  ) %>%
+  filter(!is.na(iso_a2), iso_a2 != "-99")
+
+# Clean and standardize the salary dataset country codes during summary
+dom_2025 <- salaries %>%
+  filter(work_year == 2025, employee_residence == company_location) %>%
+  mutate(employee_residence = toupper(trimws(employee_residence))) %>%
+  group_by(employee_residence) %>%
+  summarise(domestic_salary = median(salary_in_usd, na.rm = TRUE), domestic_n = n(), .groups = "drop")
+
+rem_2025 <- salaries %>%
+  filter(work_year == 2025, company_location == "US", employee_residence != "US", 
+         remote_ratio == 100) %>%
+  mutate(employee_residence = toupper(trimws(employee_residence))) %>%
+  group_by(employee_residence) %>%
+  summarise(remote_salary = median(salary_in_usd, na.rm = TRUE), remote_n = n(), .groups = "drop")
+
+# Global Remote median salary (all remote workers living in that country, ANY company location)
+rem_global_2025 <- salaries %>%
+  filter(work_year == 2025, remote_ratio == 100) %>%
+  mutate(employee_residence = toupper(trimws(employee_residence))) %>%
+  group_by(employee_residence) %>%
+  summarise(remote_salary_global = median(salary_in_usd, na.rm = TRUE), total_remote_n = n(), 
+            .groups = "drop")
+
+ov_2024 <- salaries %>%
+  filter(work_year == 2024) %>%
+  mutate(employee_residence = toupper(trimws(employee_residence))) %>%
+  group_by(employee_residence) %>%
+  summarise(med_2024 = median(salary_in_usd, na.rm = TRUE), .groups = "drop")
+
+ov_2025 <- salaries %>%
+  filter(work_year == 2025) %>%
+  mutate(employee_residence = toupper(trimws(employee_residence))) %>%
+  group_by(employee_residence) %>%
+  summarise(med_2025 = median(salary_in_usd, na.rm = TRUE), total_n = n(), .groups = "drop")
+
+# Merge safely with guaranteed matching keys
+world_arbitrage <- world %>%
+  left_join(dom_2025, by = c("iso_a2" = "employee_residence")) %>%
+  left_join(rem_2025, by = c("iso_a2" = "employee_residence")) %>%
+  left_join(rem_global_2025, by = c("iso_a2" = "employee_residence")) %>%
+  left_join(ov_2024, by = c("iso_a2" = "employee_residence")) %>%
+  left_join(ov_2025, by = c("iso_a2" = "employee_residence")) %>%
+  mutate(
+    pct_change_24_25 = ((med_2025 - med_2024) / med_2024) * 100,
+    pct_diff_rem_dom = ((remote_salary_global - domestic_salary) 
+                        / domestic_salary) * 100)
+
+remote_only_data <- world_arbitrage %>%
+  select(iso_a2, name, geometry, remote_salary) %>%
+  mutate(
+    metric_label = "Among countries with many observations, the U.S., Canada, and Australia maintain\n the highest median salaries" # Using descriptive title style/content context
+  )
+
+```
+
+```{r, fig.width=10, fig.height=13}
+# 1. Domestic Salary Map
+p1 <- ggplot(world_arbitrage) +
+  geom_sf(aes(fill = domestic_salary), color = "white", linewidth = 0.15) +
+  scale_fill_viridis_c(
+    option = "plasma",
+    na.value = "grey85",
+    name = "Median Salary",
+    labels = scales::dollar_format(prefix = "$", accuracy = 1)
+  ) +
+  coord_sf(expand = FALSE) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.05),
+    plot.margin = margin(t = 15, r = 10, b = 5, l = 10),
+    legend.position = "right"
+  ) +
+  labs(title = "Among countries with many observations, the U.S., Canada, and Australia maintain the highest median salaries")
+
+# 2. YoY Salary Percent Change Map (Divergent with 0% distinct third color)
+p2 <- ggplot(world_arbitrage) +
+  geom_sf(aes(fill = pct_change_24_25), color = "white", linewidth = 0.15) +
+  scale_fill_gradient2(
+    low = "#2b5c8f", 
+    mid = "#F2F29D", 
+    high = "#fc8d59", 
+    midpoint = 0,
+    na.value = "#ededed",
+    name = "% Change in Salary\nfrom 2024-2025",
+    labels = function(x) paste0(x, "%")
+  ) +
+  coord_sf(expand = FALSE) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.05),
+    plot.margin = margin(t = 15, r = 10, b = 5, l = 10),
+    legend.position = "right"
+  ) +
+  labs(title = "Salaries are mostly growing in emerging markets, with the EU facing stagnation or decline")
+
+# 3. Remote vs Domestic Percent Difference Map (Divergent with 0% distinct third color)
+p3 <- ggplot(world_arbitrage) +
+  geom_sf(aes(fill = pct_diff_rem_dom), color = "white", linewidth = 0.15) +
+  scale_fill_gradient2(
+    low = "#2b5c8f", 
+    mid = "#F2F29D", 
+    high = "#fc8d59", 
+    midpoint = 0,
+    na.value = "#ededed",
+    name = "% Difference Between\nRemote Median Salary\nand In-Person Median Salary",
+    labels = function(x) paste0(x, "%")
+  ) +
+  coord_sf(expand = FALSE) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.05),
+    plot.margin = margin(t = 15, r = 10, b = 5, l = 10),
+    legend.position = "right"
+  ) +
+  labs(title = "In most places, remote work is a benefit, not a penalty")
+
+# Stack them vertically using patchwork with spacing
+(p1 / p2 / p3) + 
+  plot_annotation(
+    title = "Remote and In-Person Roles in the U.S. Yield the Highest Investment Potential",
+    subtitle = "Showing 2025 Data for Median Salaries, Percentage Salary Increase from 2024, and Difference in Median Salary Between Remote\nand In-Person Roles",
+    caption = "Source: ‘Data Science, AI & ML Job Salaries in 2025’ on Kaggle",
+    theme = theme(
+      plot.title = element_text(size = 16, face = "bold", hjust = 0),
+      plot.caption = element_text(size = 10, hjust = 1, color = "grey40")
+    )
+  )
+```
+
+The second map shows median salary growth between 2024 and 2025. Here, Greece scored especially well, although the country had only 9 observations. Most countries, including the U.S., Canada, and most of the European Union actually saw declining median salaries from 2024 to 2025, with the decline sharpest in Southern Europe. Among countries with at least 30 observations in 2025, Argentina (32.4%), Ireland (13%), the United Kingdom (10.5%), Finland (8.3%), and Australia (2.2%) stood out for their positive growth rates. Although the sample size is small, emerging markets in South America, Africa, and Eastern Europe seem to stand out in terms of salary growth compared to more established markets. 
+The third map shows the remote work median salary compared to in-person median salary in each country in 2025. As can be seen, Finland has a very strong remote-work benefit, but the small sample size should be noted. Elsewhere, remote work generally offers a very slight bump throughout the board, but a strong bump in Southern Europe. Many Southern European countries had declining salaries overall though, so this remote work benefit does not necessarily indicate that remote jobs are strongly positioned there though.
+
+Overall, the biggest takeaway would be that our target company should be prioritizing hiring workers in the United States and perhaps Canada, as that is where salaries are highest. A presence in Australia, Ireland, or the United Kingdom could be beneficial as well as salaries there are both high and growing. Emerging markets such as Argentina and Finland represent strong growth potential but should be less of a priority given the more limited baseline salaries and our business plan, in which short-term benefits loom larger than long-term ones. Companies with a strong emphasis in hiring in the European Union, Japan, and South Korea should perhaps see less of a focus given the lesser baseline salary and salary growth observed in those markets. 
+
+### Where are salaries growing among job titles, company sizes, and experience tiers?
+
+Using median salaries representative of typical personnel, the time series graphic below shows how compensation trajectories differ across career levels. From 2023 to 2025, salaries for all experience tiers in medium companies appear to have stagnated. In large companies, entry-level, intermediate, and senior roles have experienced some salary growth from 2020 to 2025, but executive pay appears to have dropped. Executive pay appears to have declined in small companies too, but this may be attributable to the lack of data on executives in small companies or large companies. In small companies, intermediate roles have experienced the most salary growth. Overall, across all companies, intermediate roles have been growing by a modest amount, suggesting that we should target this experience tier. 
+
+```{r, warning = FALSE, message = FALSE}
+#| echo: False
+library(dplyr)
+library(stringr)
+library(readr)
+library(ggrepel)
+
+
+salaries_all <- read_csv(paste0(
+  "https://stat.cmu.edu/~sgallagh/courses/mads-fall-2026/",
+  "datavis-36613/data/salaries.csv.gz"
+))
+
+salaries_domains <- salaries_all %>%
+  mutate(
+    role_domain = case_when(
+      
+      str_detect(
+        job_title,
+        regex(
+          "data scientist|applied scientist|research scientist",
+          ignore_case = TRUE
+        )
+      ) ~ "Data Science",
+      
+      str_detect(
+        job_title,
+        regex(
+          "machine learning|ml engineer|ai engineer|artificial intelligence|ai ",
+          ignore_case = TRUE
+        )
+      ) ~ "AI / Machine Learning",
+      
+      str_detect(
+        job_title,
+        regex(
+          "data engineer|analytics engineer|data architect|data infrastructure",
+          ignore_case = TRUE
+        )
+      ) ~ "Data Engineering",
+      
+      str_detect(
+        job_title,
+        regex(
+          "analyst|business intelligence|analytics",
+          ignore_case = TRUE
+        )
+      ) ~ "Analytics / BI",
+      
+      str_detect(
+        job_title,
+        regex(
+          "manager|director|head|chief|vice president|vp|lead",
+          ignore_case = TRUE
+        )
+      ) ~ "Leadership",
+      
+      str_detect(
+        job_title,
+        regex(
+          "software engineer|developer|systems engineer|architect|engineer",
+          ignore_case = TRUE
+        )
+      ) ~ "Software Engineering",
+      
+      TRUE ~ "Other"
+    )
+  )
+```
+
+
+```{r, warning = FALSE, message = FALSE}
+#| echo: False
+
+library(ggplot2)
+library(tidyverse)
+library(scales)
+library(patchwork)
+library(pdftools)
+
+
+#load dataframe
+salaries = read.csv("salaries.csv")
+
+#compute SE-MI margin gains by applying filter(), group_by(), and summarise()
+#we want to create a dataframe that gives us the median margin gain for each company size across 2023-2025 
+#not enough observations of small-company execs in 2025 alone
+margin_gains = salaries |> 
+  filter(work_year %in% c(2023, 2024, 2025), experience_level %in% c("EN", "MI", "SE", "EX")) |>
+  group_by(company_size, experience_level) |> 
+  summarise(m_salary = median(salary_in_usd, na.rm = T)) |>
+  #better to use median for right-skewed salary distribution 
+  pivot_wider(names_from = experience_level, values_from = m_salary) |> #rearrange table so there is a column for each experience level and a row for each company size
+  mutate(
+    EN_to_MI = ((MI-EN)/EN)*100,
+    MI_to_SE = ((SE-MI)/MI)*100, #percentage margin gain
+    SE_to_EX = ((EX-SE)/SE)*100,
+    company_size = factor(company_size,
+                          levels = c("S", "M", "L"),
+                          labels = c("Small Companies", "Medium Companies", "Large Companies"))
+  ) |>
+  select(company_size, EN_to_MI, MI_to_SE, SE_to_EX) |>
+  pivot_longer(
+    cols = c(EN_to_MI, MI_to_SE, SE_to_EX),
+    names_to = "transition",
+    values_to = "margin_gain"
+  ) # pivot back to long format table for graphing
+
+#create faceted bar chart for percent margin gains
+
+margin_plot = margin_gains |> ggplot(aes(x = transition, y = margin_gain, fill = transition)) + 
+  geom_col(show.legend = F) + 
+  facet_wrap(~company_size)+
+  labs(
+    title = "Transitioning from entry-level to intermediate roles yields the highest \nmargin gain",
+    subtitle = "",
+    x = "Career Transition Phase",
+    y = "Margin Gain (%)",
+    caption = "\nEN: Entry-level | MI: Intermediate | SE: Senior-level | EX: Executive
+
+Evidence Limitation: There is no data on small-company executives in 2024 or 2025, so this plot uses data from \n2023 to 2025. This possibly introduces frequency bias from recurring roles, that is, the same jobs recorded in \ndifferent years.
+
+Source: ‘Data Science, AI & ML Job Salaries in 2025’ on Kaggle"
+  ) +
+  scale_x_discrete(
+    labels = c(
+      "EN_to_MI" = "EN-MI",
+      "MI_to_SE" = "MI-SE",
+      "SE_to_EX" = "SE-EX"
+    )
+  ) +
+  theme_minimal() +
+  theme(strip.text = element_text(face = "bold"),
+        plot.caption = element_text(hjust = 0),
+        plot.title = element_text(face = "bold"),
+        text = element_text(size = 15))
+#modify dataframe for faceted time series
+#use group_by() and summarise() so that we get the median salary for each combination of work year, experience level, and company size
+mod_data = salaries |>
+  mutate(
+    company_size = factor(company_size,
+                          levels = c("S", "M", "L"),
+                          labels = c("Small Companies", "Medium Companies", "Large Companies")),
+    experience_level = factor(experience_level, levels =c("EN", "MI", "SE", "EX"))) |> #convert to ordinal categorical vars
+  group_by(work_year, experience_level, company_size) |>
+  summarise(m_salary = median(salary_in_usd, na.rm = T),
+            n = n(), # count sample size = # of rows per group
+            .groups = "drop") |>
+  mutate(
+    n_group = cut(n, breaks = c(-Inf, 30, 100, Inf), labels = c("n < 30", "30 ≤ n ≤ 100", "n > 100"))
+  ) # create bins for sample size
+#get median for right-skewed salary distribution
+#ungroup so we can plot data
+
+
+#create faceted time series with year on x-axis, salary on y-axis, and different colors for different experience levels
+
+exp_ts = mod_data |>
+  ggplot(aes(x = work_year, y = m_salary, color = experience_level, shape = n_group)) +
+  geom_line(aes(group = experience_level), linewidth = 1)+ #connect points with lines
+  geom_point(size = 3) + #increase size of points
+  facet_wrap(~company_size)+ #create separate graphs for each company size
+  scale_shape_manual(values = c("n < 30" = 1, "30 ≤ n ≤ 100" = 16, "n > 100" = 17)) + # adjust point shape for sample size
+  scale_y_continuous(labels = dollar_format())+ #format y-axis units as dollars
+  
+  #labels and formatting
+  labs(
+    title = "Salaries for intermediate roles have grown across all company \nsizes",
+    subtitle = "",
+    caption = "EN: Entry-level | MI: Intermediate | SE: Senior-level | EX: Executive
+    
+Evidence Limitation: Earlier years have much fewer observations. Most companies are medium size, so the \nrelatively few observations for certain experience tiers at small or large companies have higher leverage. Also, \nthere is no data on small-company executives in 2020, 2024, and 2025.
+
+Source: ‘Data Science, AI & ML Job Salaries in 2025’ on Kaggle",
+    x = "Year",
+    y = "Median Salary (USD)",
+    color = "Experience Tier",
+    shape = "Sample Size"
+  )+
+  theme_minimal()+
+  theme(
+    legend.position="bottom", #bottom the legend so more horizontal space; could also just make a pdf 
+    strip.text = element_text(face = "bold"),
+    #size = 10)
+    plot.title = element_text(face = "bold"),
+    plot.caption = element_text(hjust = 0),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    text = element_text(size = 15)
+  )+
+  guides(
+    color = guide_legend(nrow=2),
+    shape = guide_legend(nrow=2)
+  )
+#reduce text size, angle x-axis unit labels 
+
+#exp_playbook = exp_ts / margin_plot +
+#  plot_annotation(
+#    title = "Career Progression and Experience Playbook",
+#    subtitle = "The highest margin gain is from entry-level to #intermediate roles. Salaries for intermediate roles have grown #in recent years across all company sizes."
+
+
+mod_data1 = salaries_domains |>
+  mutate(
+    company_size = factor(company_size,
+                          levels = c("S", "M", "L"),
+                          labels = c("Small Companies", "Medium Companies", "Large Companies"))) |>
+  filter(role_domain %in% c("Data Science", "AI / Machine Learning", "Data Engineering", "Leadership", "Software Engineering", "Analytics / BI")) |>
+  group_by(work_year, role_domain, company_size) |>
+  summarise(m_salary = median(salary_in_usd, na.rm = T),
+            n = n(),
+            .groups = "drop") |>
+  mutate(n_group = cut(n, breaks = c(-Inf, 30, 100, Inf), labels = c("n < 30", "30 ≤ n ≤ 100", "n > 100"))) # create bins for sample size
+#get median for right-skewed salary distribution
+#ungroup so we can plot data
+
+
+#create faceted time series with year on x-axis, salary on y-axis, and different colors for different experience levels
+
+
+role_ts = mod_data1 |>
+  ggplot(aes(x = work_year, y = m_salary, color = role_domain, shape = n_group))+
+  geom_line(aes(group = role_domain), linewidth = 1)+ #connect points with lines
+  geom_point(size = 3) + #increase size of points
+  facet_wrap(~company_size)+ #create separate graphs for each job title
+  scale_y_continuous(labels = dollar_format())+ #format y-axis units as dollars
+  scale_shape_manual(values = c("n < 30" = 1, "30 ≤ n ≤ 100" = 16, "n > 100" = 17)) + # adjust point shape for sample size
+  #labels and formatting
+  labs(
+    title = "Software Engineering salaries have surged in recent years.",
+    subtitle = "",
+    caption = "Evidence Limitation: Software Engineering roles have little to no observations in 2020, perhaps due to \nchanging industry taxonomy and lack of data. Also, small-company roles are characterized by low sample \nsizes.
+
+Source: ‘Data Science, AI & ML Job Salaries in 2025’ on Kaggle",
+    x = "Year",
+    y = "Median Salary (USD)",
+    color = "Role Domain", 
+    shape = "Sample Size"
+  )+
+  theme_minimal()+
+  theme(
+    legend.position="bottom",
+    legend.box = "horizontal",
+    strip.text = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.caption = element_text(hjust = 0),
+    text = element_text(size = 15)
+  ) +
+  guides(
+    color = guide_legend(nrow=3),
+    shape = guide_legend(nrow=3)
+  )
+```
+
+```{r, warning = FALSE, message = FALSE}
+#| echo: False
+#| fig-height: 7
+#| fig-width: 9
+plot_png = function(plot, prefix = "plot", text_size = 15,
+                    res = 300) {
+  pdf_name = paste0(prefix, ".pdf")
+  png_name = paste0(prefix, ".png")
+  
+  pdf(pdf_name)
+  print(plot+ theme(text = element_text(size = text_size)))
+  dev.off()
+  pdf_convert(pdf_name, format = "png", dpi = res, filenames = png_name)
+}
+
+#exp_playbook
+# plot_png(exp_ts, "exp_ts")
+exp_ts
+```
+
+```{r, warning = FALSE, message = FALSE}
+#| echo: False
+#| fig-height: 5.5
+#| fig-width: 9
+margin_plot
+```
+
+The faceted bar chart above answers what the financial return is when progressing through career tiers. Across all company sizes, the transition phase from entry-level to intermediate roles has the highest percent margin gain. Transitioning from intermediate to senior roles has a smaller margin gain, and the transition to executive roles has the lowest margin gain. The margin gain from senior to executive roles appears to be negative in small and large companies, which strains credulity and may be more reflective of the lack of data on small-company and large-company executives. Nonetheless, the general pattern seems to suggest that the transition to mid-level roles yields the highest margin gain, and there is a diminishing return as one advances up career tiers. This suggests that target intermediate or senior-level roles should be targeted. 
+
+```{r, warning = FALSE, message = FALSE}
+#| echo: False
+#| fig-height: 7
+#| fig-width: 9
+role_ts
+```
+
+Using median salaries to be representative of typical personnel, this time series graphic reveals where salaries are growing, specifically in which role domains. Out of the six main role domains, Software Engineering has experienced the highest salary growth across all company sizes. AI and Machine Learning roles in medium companies have also witnessed impressive salary growth. In medium and large companies, the 2025 salaries for Software Engineering are roughly comparable to those for Leadership, Data Engineering, Data Science, and AI/Machine Learning. In small companies, it is more difficult to make conclusions due to the absence of 2025 data for Software Engineering roles. Nonetheless, what limited data there is suggests that compared to medium and large companies, small companies pay lower salaries for all role domains except for Software Engineering, at least in 2024. Based on this, targeting Software Engineering roles seems advisable, since they display the most consistent salary growth. 
+
+## Recruiting Playbook
+
+### Target Employer
+
+We have selected Google LLC as the target employer based on credible external evidence from [Revelio Labs](https://www.reveliolabs.com/) and [Levels.fyi](https://www.levels.fyi/). Revelio Labs is a comprehensive workforce database that collects and aggregates all publicly available professional profiles, job postings, and employee sentiment reviews. Levels.fyi is a career transparency site that provides compensation data across different companies, roles, and experience tiers based on self-reported user submissions.  
+
+According to [workforce intelligence data](https://www.reveliolabs.com/companies/google/employees) from Revelio Labs, Google has approximately 191,063 total employees, 46.3% of whom are in the Engineering department. 48% of Google’s global workforce is in North America, our geographical region of interest. Google's hiring velocity is accelerating with 21,181 active job postings in 2026, a 94.7% increase from 2025. If the proportion of new job postings that belong to the Engineering department is similar to 46.3%, then we might assume that around 5,000-10,000 new job postings are for Engineering roles. Additionally, employee sentiment at Google is broadly positive and improving, so it is likely that new hires will remain at Google for longer than six months, allowing our company to establish productive relations with the target company.
+
+### Priority Roles, Experience Tiers, and Directional Compensation Benchmarks
+
+Our findings indicate that machine learning, AI, and software engineering roles have the strongest compensation and growth potential. Thus, the priority roles should be Software Engineer, Machine Learning Engineer, and AI Engineer positions at the L4 (intermediate) and L5 (senior) experience tiers in the US.
+
+```{r, warning = FALSE, message = FALSE}
+#| echo: False
+#| fig-height: 5.5
+#| fig-width: 11
+
+# dataframe for stacked bar chart on Google role salaries
+comp_data <- data.frame(
+  Role_Level = c(
+    "L4 Software Engineer (n=55)", 
+    "L5 Software Engineer (n=37)", 
+    "L4 Machine Learning Engineer (n=14)", 
+    "L5 Machine Learning Engineer (n=17)", 
+    "L5 AI Engineer (n=7)"
+  ),
+  Base_Salary = c(192000, 233000, 189000, 216000, 191000),
+  Stock = c(93400, 183000, 104000, 185000, 133000),
+  Bonus_SignOn = c(23700, 32700, 18700, 33000, 31400)
+)
+
+# convert to long table
+comp_long <- comp_data |>
+  pivot_longer(
+    cols = c(Base_Salary, Stock, Bonus_SignOn),
+    names_to = "Component",
+    values_to = "Amount"
+  ) |>
+  mutate(
+    Component = factor(Component, 
+                       levels = c("Bonus_SignOn", 
+                                  "Stock", 
+                                  "Base_Salary"),
+                       labels = c("Bonus & Sign-on", 
+                                  "First Year Stock", 
+                                  "Base Salary")),
+    Role_Level = factor(Role_Level, levels = rev(c(
+      "L4 Software Engineer (n=55)", 
+      "L5 Software Engineer (n=37)", 
+      "L4 Machine Learning Engineer (n=14)", 
+      "L5 Machine Learning Engineer (n=17)", 
+      "L5 AI Engineer (n=7)"
+    )))
+  )
+
+comp_long |>
+  ggplot(aes(x=Role_Level,
+             y = Amount, 
+             fill = Component)) +
+  coord_flip() +
+  geom_col(width = 0.8, position = "stack")+
+  scale_y_continuous(labels = dollar_format(prefix = "$", scale = 1e-3, suffix = "K")) +
+  labs(title = "Google Software Engineer roles should be \nprioritized as core searches",
+       subtitle = "",
+       x = "", 
+       y = "Annual Compensation (USD)", 
+       fill = "Salary Component",
+       caption = "Source: Levels.fyi salary data on Google Software Engineer, Machine Learning \nEngineer, and AI Engineer roles in the US. Last accessed Oct 7, 2026."
+       ) +
+  theme_minimal() +
+  theme(
+    legend.position="bottom",
+    legend.box = "horizontal",
+    strip.text = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 0, hjust = 1),
+    plot.caption = element_text(hjust = 0),
+    text = element_text(size = 18)) +
+  guides(fill = guide_legend(reverse = TRUE))
+
+
+```
+
+This bar chart displays directional compensation benchmarks from Levels.fyi, with sample sizes indicated for each role of interest. For example, Levels.fyi tracks n=55 observations on [L4 Software Engineers](https://www.levels.fyi/companies/google/salaries/software-engineer) at Google in the US. These observations likely reflect trailing salary data from self-reported submissions over the past few years, though the exact time scope is unclear. The median L4 Software Engineer earns an approximate total compensation of $309,000, which comprises a base salary of $192,000, a first year stock of $93,400, and a bonus and sign-on of $23,700. This should be the core search, as we may expect a high volume and demand for intermediate-level Software Engineers, especially in the main tech hubs like the San Francisco Bay Area and New York City. This would enable repeat business between our company and the target company, deepening relations. The compensation benchmarks can be treated as reliable, given the moderately large sample size. 
+[L5 Software Engineers](https://www.levels.fyi/companies/google/salaries/software-engineer) should be a selective search. The sample size is not as high as those for intermediate roles, and fewer user submissions perhaps indicates a lower volume of L5 Software Engineer positions. 
+[L4 Machine Learning Engineers](https://www.levels.fyi/companies/google/salaries/software-engineer/title/machine-learning-engineer) and [L5 Machine Learning Engineers](https://www.levels.fyi/companies/google/salaries/software-engineer/title/machine-learning-engineer) earn comparable compensation to Software Engineers of the same experience tiers. However, Machine Learning Engineer roles should be regarded as experimental searches due to lower sample sizes and greater risk. The high compensation benchmarks may not be entirely reliable, and the sparsity of data may also suggest lower demand.
+Levels.fyi had no data on L4 AI Engineers but did record n=7 observations for [L5 AI Engineers](https://www.levels.fyi/companies/google/salaries/software-engineer/title/ai-engineer) in the US. Their total compensation appears to be lower than that for L5 Software Engineers and Machine Learning Engineers. Since there are little to no observations for AI Engineers, these roles should be treated as deferred searches.
+The next data source which our company should acquire is role-level hiring data, so that we know the precise number of Software Engineering roles for which Google is actively hiring. Data on new postings grouped by experience tier would also be useful, as would data on attrition rates and exact salaries for relevant roles. All this important data can be commissioned from Revelio Labs or Levels.fyi. 
+
+## Uncertainty, Caveats, and Rejected Claims
+
+While we believe that the dataset combined with our external research strongly supports Google as the ideal pitch candidate, there are several caveats that limit the certainty behind our conclusions.
+
+First, as stated in the “Data Scope and Credibility Audit” section, the job postings included in the dataset do not come with company names attached. Our selection of Google does reflect that of a company that matches all the characteristics of a company with high placement opportunities gleaned from the dataset: a large company with many AI engineer and machine learning engineer roles at mid-level and senior-level positions that has a strong U.S. presence with additional opportunity to grow in emerging markets. However, our analysis would have been bolstered if company names were included in the dataset as we could have a more direct view of which companies have the highest-paying roles.
+
+The dataset itself is limited in what conclusions each row actually warrants. We cannot say that the number of observations reflects company demand or candidate interest; all we know is that these postings were the ones included on the job board. The salary data that we have is also limited given that it does not necessarily reflect total compensation, such as stock or signing bonuses. Salaries are also not inflation-adjusted, meaning that data from earlier years may be biased towards lower salary numbers. Thus, any time-based trends we observed could simply reflect inflation-adjusted salaries rather than an actual growth in the market. Our research is also correlational in nature; the results reflect descriptive associations between certain variables and success rather than a causal explanation.
+
+As discussed in the data scope section, much of the study focuses on data for the first seven months of 2025, which represents a limited timeframe. The sparsity of information for many countries and many duplicates restrict our analysis as well. To further our claims, we would want both more recent data and a wider time and geographic span to be sure that the trends we are observing reflect overall trends and not just a blip in the market over the observable data. 
+
+The dataset is also limited in the specificity of other information, including geographic location and remote work ratios. If we had subnational-level data, we could more accurately determine the strength of our company selection. Given that our firm desires to target a U.S.-based company, having city or state-level data for American companies would be especially helpful in narrowing down the search of what potential targets are strongly-positioned geographically. Having a stronger breakdown of remote work ratios, especially given the rise of hybrid workplace setups comparative to the lack of hybrid observations in the dataset, would also be very useful.
+
+Finally, our target selection is limited by the scope of publicly-available data. While it would be ideal to have detailed financial reports as well as the exact breakdown of new hirings by job title and experience level for all potential targets, that data is not for the most part publicly-accessible. Although our selection of Google as the ideal target was limited to supporting details we could find online and through market research firms, we do believe that our case for choosing our target is strong.
+
+Despite the limitations of our dataset, we believe that Google LLC remains the strongest choice for a potential target given the information that was available.
+
+## Approval Request and Further Data to Acquire
+
+We request that our company approve Google LLC as the target employer. The next evidence to acquire would be precise hiring data on new US-based L4 and L5 Software Engineer positions, which should be considered core searches and selective searches respectively. 
+
+## Appendix
+
+Our analysis relies on the [Global Data & AI Workforce Compensation database](https://aijobs.net/salaries/) with a snapshot date of August 3, 2025, which is mirrored by the Kaggle dataset [Data Science, AI & ML Job Salaries in 2025](https://www.kaggle.com/datasets/adilshamim8/salaries-for-data-science-jobs). We last accessed the Kaggle dataset on October 8, 2026. We chose to report compensation in U.S. dollars to convert all salaries to a common currency. 
+
+We chose not to remove all duplicates, because we could not be certain whether a given duplicate was erroneous or a genuinely distinct job with identical characteristics.This is a limitation of the data. However, to compensate partially for recurring roles, that is, the same jobs observed in different years, we elected to rely on only 2025 data with few exceptions. Restricting the analysis to 2025 also avoids issues associated with changing labor-market conditions across years but may result in incomplete coverage, considering that not all 2025 records were available at the time of collection. This is another limitation of the data.
+
+The 2025 dataset contains 316 unique job titles, reflecting the diversity of roles within the data and AI labor market. The most common positions include Software Engineer (9,191 observations), Data Scientist (7,358), Engineer (6,986), Data Engineer (6,974), Data Analyst (6,499), Manager (5,359), Analyst (4,005), and Machine Learning Engineer (3,093). Since many titles describe similar work while using different naming conventions (e.g., Software Engineer, Engineer, Systems Engineer, and Architect), individual job titles were grouped into broader role families to facilitate meaningful comparisons of compensation patterns. Any title that did not match one of the predefined patterns was assigned to the “Other” category. These role families were created analytically and are not supplied directly by the source dataset.
+
+
+```{r, echo=FALSE}
+library(knitr)
+
+role_domain_table <- data.frame(
+  Role_Domain = c(
+    "Data Science",
+    "AI / Machine Learning",
+    "Data Engineering",
+    "Analytics / BI",
+    "Leadership",
+    "Software Engineering",
+    "Other"
+  ),
+  Example_Titles = c(
+    "Data Scientist, Applied Scientist, Research Scientist",
+    "Machine Learning Engineer, AI Engineer, Artificial Intelligence roles",
+    "Data Engineer, Analytics Engineer, Data Architect, Data Infrastructure Engineer",
+    "Analyst, Business Intelligence, Analytics roles",
+    "Manager, Director, Head, Chief, Vice President, Lead",
+    "Software Engineer, Systems Engineer, Developer, Architect, Engineer",
+    "Titles not captured by the above rules"
+  )
+)
+
+colnames(role_domain_table) <- c(
+  "Role Domain",
+  "Example Titles"
+)
+
+knitr::kable(
+  role_domain_table,
+  caption = "Role Family Definitions Used in the Analysis"
+)
+```
+
+To examine hiring and compensation data from specific companies, we relied on [Revelio Labs](https://www.reveliolabs.com/) and [Levels.fyi](https://www.levels.fyi/). Revelio Labs provides comprehensive workforce intelligence data that aggregates publicly available professional profiles, job postings, and employee sentiment reviews for a given country. Levels.fyi is a career transparency site that collects self-reported user submissions and shows compensation data across companies, roles, and experience tiers.  
+
+We looked at several Fortune 500 companies, including IBM, NVIDIA, and Microsoft. Our objective was to find a company actively hiring for a large number of intermediate-level Software Engineering roles. We settled on Google after finding that it had a large Engineering department, high salaries, an accelerating hiring velocity, and broadly positive employee sentiment. Other options performed more poorly in at least one respect. For example, Microsoft had neutral employee sentiment, a falling hiring velocity, and lower salaries. 
+
+When deciding which roles to prioritize, we looked at the directional compensation benchmarks and sample sizes for jobs at Google on Levels.fyi. Our earlier research suggested that Software Engineering and AI / Machine Learning roles at the intermediate or senior experience tiers were worth targeting. We selected L4 (intermediate) Software Engineers as core searches because they had a moderately high sample size and were likely to have a higher volume and demand than their senior counterparts, who were classed as selective searches. Machine Learning Engineers did not have many observations, so we categorized them as experimental searches due to the risk. AI Engineers had little to no observations. Hence, we designated them as deferred searches.
+
+The relevant code for our graphics can be seen by selecting the "</> Code" option at the top right of the html or by accessing the attached qmd file. To sort our data and create figures like histograms, time series, and maps, we used R packages such as dplyr, ggplot2, scales, readr, stringr, tidyverse, sf, rnaturalearth, scales, ggthemes, and patchwork.
+
